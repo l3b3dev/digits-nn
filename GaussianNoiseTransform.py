@@ -1,7 +1,7 @@
 import torch
 
 
-# Noise is Gaussian with 10 percent cross-section
+# Noise is Gaussian with 14 percent cross-section
 class GaussianNoiseTransform(object):
     def __init__(self, mean=0., std=1., k=25):
         self.std = std
@@ -17,7 +17,7 @@ class GaussianNoiseTransform(object):
         idx = perm[:(n - self.k)]
 
         noise = torch.randn(x_transf.size())
-        # only 10% is noise
+        # only 14% is noise
         noise[idx] = 0.
 
         corrupted_image = x_transf + noise * self.std + self.mean

@@ -68,6 +68,6 @@ class Plotter:
         plt.axes().set_xticklabels(x)
         #plt.legend(labels=x)
         plt.title('Graph of Fh and Ffa for noise-corrupted Alphanumeric Imagery \n (16x16 pixels) for Autoassociative Single-Layer Perceptron')
-        plt.xlabel('Gaussian Noise Level (stdev, at 10 pct xsecn)')
+        plt.xlabel('Gaussian Noise Level (stdev, at 14 pct xsecn)')
         plt.ylabel('Fh and Ffa')
         plt.show()
