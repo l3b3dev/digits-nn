@@ -1,10 +1,11 @@
 import torch.nn as nn
 
+""" Multi-Layer Neural Network"""
 
-# Basic Perceptron
-class Perceptron(nn.Module):
+
+class DNet(nn.Module):
     def __init__(self, net_inputs, net_output, activation):
-        super(Perceptron, self).__init__()
+        super(DNet, self).__init__()
         self.fc1 = nn.Linear(net_inputs, net_output)
         self.act = activation
 
