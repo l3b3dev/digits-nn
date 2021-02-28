@@ -6,7 +6,7 @@ class Plotter:
     def plot_data(image_datasets, x_train, y_train, kind='train'):
         # plot train data with labels
         R, C = 1, x_train.size(0)
-        fig, ax = plt.subplots(R, C)
+        fig, ax = plt.subplots(R, C, figsize=(12,10))
         fig.suptitle('Training Data with corresponding labels')
         for i, plot_cell in enumerate(ax):
             plot_cell.grid(False)

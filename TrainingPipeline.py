@@ -8,21 +8,18 @@ from torchvision import datasets, transforms
 
 
 from GaussianNoiseTransform import GaussianNoiseTransform
-from NN import DNet
+from NN import DClassNet
 from Plotter import Plotter
 
 
 class TrainingPipeline:
     def __init__(self):
-        self.models = [DNet(16 * 16, 1, nn.LeakyReLU()), DNet(16 * 16, 20, nn.Sigmoid()),
-                       DNet(16 * 16, 16 * 16, nn.Sigmoid())]
-        self.loss = [nn.MSELoss(), nn.MSELoss(), nn.MSELoss()]
-        self.optimizer = self.init_optimizer(3)
+        self.models = [DClassNet(16 * 16, 65)]
+        self.loss = [nn.NLLLoss()] #negative log-likelihood loss, needed for classification of 65 objects
+        self.optimizer = self.init_optimizer(1)
 
     def init_optimizer(self, approach):
-        self.optimizer = [SGD(self.models[approach - 1].parameters(), lr=0.001),
-                          Adam(self.models[approach - 1].parameters(), lr=0.001),
-                          Adam(self.models[approach - 1].parameters(), lr=0.001)]
+        self.optimizer = [SGD(self.models[approach - 1].parameters(), lr=0.001)]
 
         return self.optimizer
 
@@ -33,13 +30,15 @@ class TrainingPipeline:
         optimizer = self.optimizer[approach - 1]
         return model, loss_fn, optimizer
 
+    """ Negative log-likelihood loss and LogSoftmax together are the cross-entropy loss"""
     def train(self, x, y, model, optimizer, loss_fn, approach, num_epochs=10000):
+        y = y.type(torch.LongTensor)
         loss_history = []
         for epoch in range(num_epochs):
             optimizer.zero_grad()
             pred = model(x)
-            if approach != 3:
-                pred = pred.squeeze(1)
+            # if approach != 3:
+            #     pred = pred.squeeze(1)
 
             loss_value = loss_fn(pred, y)
             loss_value.backward()
@@ -63,6 +62,9 @@ class TrainingPipeline:
             'test': transforms.Compose([
                 transforms.ToTensor()
             ]),
+            'raw': transforms.Compose([
+                transforms.ToTensor()
+            ])
         } if sdev == 0. else {
             'train': transforms.Compose([
                 transforms.ToTensor()
@@ -71,18 +73,22 @@ class TrainingPipeline:
                 transforms.ToTensor(),
                 GaussianNoiseTransform(std=sdev, k=25)
             ]),
+            'raw': transforms.Compose([
+                transforms.ToTensor(),
+                GaussianNoiseTransform(std=sdev, k=25)
+            ]),
         }
 
         # Create training and validation datasets
         image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x), data_transforms[x]) for x in
-                          ['train', 'test']}
+                          ['train', 'test', 'raw']}
         # Create training and validation dataloaders
         image_dataloaders = {
             x: torch.utils.data.DataLoader(image_datasets[x], batch_size=image_datasets[x].__len__(),
                                            shuffle=True if x == 'train' else False)
             for x
             in
-            ['train', 'test']}
+            ['train', 'test', 'raw']}
 
         return image_datasets, image_dataloaders
 
@@ -104,11 +110,19 @@ class TrainingPipeline:
 
         return X_train, Y_train, X_train_f
 
+    @torch.no_grad()
     def predict(self, approach_number, model, x, x_test):
-        y_pred = model(x)
+        #y_pred = model(x)
 
         if approach_number == 1:
-            return x_test[int(round(y_pred.item())) - 1]
+            img = x.view(1, 16*16)
+            y_pred = model(img)
+            # Predictions are log-probabilities, do exponentials for real probabilities
+            probs = list(torch.exp(y_pred).numpy()[0])
+            # The index of the output pattern is found by locating the maximum value of y,
+            # then finding the indx j of that value
+            y = probs.index(max(probs))
+            return x_test[y-1]
         elif approach_number == 2:
             # The index of the output pattern is found by locating the maximum value of y,
             # then finding the indx j of that value
@@ -122,12 +136,13 @@ class TrainingPipeline:
         self.init_optimizer(approach_number)
         # setup labeling indexed list
         labels = [torch.FloatTensor([float(image_datasets['train'].classes[lookup]) for lookup in y_train]),
-                  self.get_lbl_tensor(image_datasets, y_train),
+                  # self.get_lbl_tensor(image_datasets, y_train),
                   x_train_f
                   ]
         model, loss_func, opt = self.get_model(approach_number)
+
         loss_history = self.train(x_train_f, labels[approach_number - 1],
-                                  model, opt, loss_func, approach_number, 8000 if approach_number == 3 else 400)
+                                  model, opt, loss_func, approach_number, 8000)
         Plotter.plot_losses(loss_history)
 
         y_test_pred = self.predict(approach_number, model, x_train_f[0], x_test)
