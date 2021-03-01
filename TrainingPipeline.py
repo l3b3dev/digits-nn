@@ -117,27 +117,24 @@ class TrainingPipeline:
             return y_pred
 
     @torch.no_grad()
-    def get_class_probabilities(self, classifier, y, x, id_class):
+    def get_class_probabilities(self, classifier, x, x_test):
         classifier.eval()
-        actuals = []
-        probabilities = []
         output = classifier(x)
         prediction = output.argmax(dim=1, keepdim=True)
-        actuals.extend(y.view_as(prediction) == id_class)
-        probabilities.extend(np.exp(output[:, id_class]))
+        pred_images = x_test[prediction - 1]
+        actuals = x.view_as(pred_images)
+        sm = torch.nn.Softmax()
+        probabilities = sm(pred_images)
 
-        return [i.item() for i in actuals], [i.item() for i in probabilities]
+        return [p.item() for i in actuals for j in i for p in j], [p.item() for i in probabilities for j in i for p in j]
 
     @torch.no_grad()
-    def get_image_probabilities(self, classifier, y, x):
+    def get_image_probabilities(self, classifier, x):
         classifier.eval()
-        actuals = []
-        probabilities = []
         output = classifier(x)
-        actuals.extend(y.view_as(output))
+        actuals = x.view_as(output)
         sm = torch.nn.Softmax()
         probabilities = sm(output)
-        #probabilities.extend(np.exp(output[:, id_class]))
 
         return [j.item() for i in actuals for j in i], [j.item() for i in probabilities for j in i]
 

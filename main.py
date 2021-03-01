@@ -16,6 +16,10 @@ if __name__ == '__main__':
     # train model for Approach1
     model1 = pipeline.run_approach(1, X_train_f, X_train, X_raw_f, Y_train, image_datasets)
 
+    #get info for ROC
+    actuals, class_probabilities = pipeline.get_class_probabilities(model1, X_test_f, X_raw_f)
+    Plotter.plot_class_roc(actuals, class_probabilities)
+
     # # train model for Approach2
     model2 = pipeline.run_approach(2, X_train_f, X_train, X_test_f, Y_train, image_datasets)
 
@@ -32,13 +36,8 @@ if __name__ == '__main__':
 
     Plotter.plot_stats(Fh, Ffa)
 
-    # for_class = 5
-    # actuals, class_probabilities = pipeline.get_class_probabilities(model, Y_test, X_test_f, for_class)
-    # Plotter.plot_class_roc(actuals, class_probabilities, for_class)
-
-    # for_class = 5
-    actuals, class_probabilities = pipeline.get_image_probabilities(model, X_test_f, X_test_f)
-    Plotter.plot_class_roc(actuals, class_probabilities, 1)
+    actuals, class_probabilities = pipeline.get_image_probabilities(model, X_test_f)
+    Plotter.plot_class_roc(actuals, class_probabilities)
 
     # # corrupt all images with Gaussian noise
     # sdevs = [0., 0.001, 0.002, 0.003, 0.005, 0.01, 0.02, 0.03, 0.05, 0.1]

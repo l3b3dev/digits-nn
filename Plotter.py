@@ -52,7 +52,7 @@ class Plotter:
         plt.show()
 
     @staticmethod
-    def plot_class_roc(actuals, class_probabilities, id_class):
+    def plot_class_roc(actuals, class_probabilities):
         fpr, tpr, _ = roc_curve(actuals, class_probabilities)
         roc_auc = auc(fpr, tpr)
         plt.figure()
@@ -64,7 +64,7 @@ class Plotter:
         plt.ylim([0.0, 1.05])
         plt.xlabel('False Positive Rate')
         plt.ylabel('True Positive Rate')
-        plt.title('ROC for digit=%d class' % id_class)
+        plt.title('ROC Curve')
         plt.legend(loc="lower right")
         plt.show()
 
