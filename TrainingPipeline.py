@@ -5,25 +5,27 @@ import torch
 from torch import nn
 from torch.optim import SGD, Adam
 from torchvision import datasets, transforms
-
+import numpy as np
 
 from GaussianNoiseTransform import GaussianNoiseTransform
-from NN import DClassNet
+from NN import DClassNet, DNet
 from Plotter import Plotter
 
 
 class TrainingPipeline:
     def __init__(self):
-        self.models = [DClassNet(16 * 16, 65)]
-        self.loss = [nn.NLLLoss()] #negative log-likelihood loss, needed for classification of 65 objects
+        self.models = [DClassNet(16 * 16, 65), DNet(16 * 16)]
+        self.loss = [nn.NLLLoss(),  # negative log-likelihood loss, needed for classification of 65 objects
+                     nn.MSELoss()]
         self.optimizer = self.init_optimizer(1)
 
     def init_optimizer(self, approach):
-        self.optimizer = [SGD(self.models[approach - 1].parameters(), lr=0.001)]
+        self.optimizer = [SGD(self.models[approach - 1].parameters(), lr=0.001),
+                          Adam(self.models[approach - 1].parameters(), lr=0.001)]
 
         return self.optimizer
 
-    # Will try 03 approaches as listed in Step 02
+    # Will try 2 approaches as listed in Step 02
     def get_model(self, approach):
         model = self.models[approach - 1]
         loss_fn = self.loss[approach - 1]
@@ -31,15 +33,13 @@ class TrainingPipeline:
         return model, loss_fn, optimizer
 
     """ Negative log-likelihood loss and LogSoftmax together are the cross-entropy loss"""
-    def train(self, x, y, model, optimizer, loss_fn, approach, num_epochs=10000):
-        y = y.type(torch.LongTensor)
+
+    def train(self, x, y, model, optimizer, loss_fn, num_epochs=10000):
+
         loss_history = []
         for epoch in range(num_epochs):
             optimizer.zero_grad()
             pred = model(x)
-            # if approach != 3:
-            #     pred = pred.squeeze(1)
-
             loss_value = loss_fn(pred, y)
             loss_value.backward()
             optimizer.step()
@@ -92,16 +92,6 @@ class TrainingPipeline:
 
         return image_datasets, image_dataloaders
 
-    # get labels for Approach 02
-    def get_lbl_tensor(self, image_datasets, y, kind='train'):
-        mapped_lbls = [int(image_datasets[kind].classes[lookup]) for lookup in y]
-
-        lbls_list = torch.zeros(10, 20)
-        for i, indx in enumerate(mapped_lbls):
-            lbls_list[i][indx - 1] = 1
-
-        return lbls_list
-
     def load_all_data(self, image_dataloaders, kind='train'):
         # load
         X_train, Y_train = next(iter(image_dataloaders[kind]))
@@ -112,37 +102,55 @@ class TrainingPipeline:
 
     @torch.no_grad()
     def predict(self, approach_number, model, x, x_test):
-        #y_pred = model(x)
-
         if approach_number == 1:
-            img = x.view(1, 16*16)
+            img = x.view(1, 16 * 16)
             y_pred = model(img)
             # Predictions are log-probabilities, do exponentials for real probabilities
             probs = list(torch.exp(y_pred).numpy()[0])
             # The index of the output pattern is found by locating the maximum value of y,
             # then finding the indx j of that value
             y = probs.index(max(probs))
-            return x_test[y-1]
-        elif approach_number == 2:
-            # The index of the output pattern is found by locating the maximum value of y,
-            # then finding the indx j of that value
-            y = torch.argmax(y_pred)
-            return x_test[y.item()]
+            return x_test[y - 1]
 
-        elif approach_number == 3:
+        elif approach_number == 2:
+            y_pred = model(x)
             return y_pred
+
+    @torch.no_grad()
+    def get_class_probabilities(self, classifier, y, x, id_class):
+        classifier.eval()
+        actuals = []
+        probabilities = []
+        output = classifier(x)
+        prediction = output.argmax(dim=1, keepdim=True)
+        actuals.extend(y.view_as(prediction) == id_class)
+        probabilities.extend(np.exp(output[:, id_class]))
+
+        return [i.item() for i in actuals], [i.item() for i in probabilities]
+
+    @torch.no_grad()
+    def get_image_probabilities(self, classifier, y, x):
+        classifier.eval()
+        actuals = []
+        probabilities = []
+        output = classifier(x)
+        actuals.extend(y.view_as(output))
+        sm = torch.nn.Softmax()
+        probabilities = sm(output)
+        #probabilities.extend(np.exp(output[:, id_class]))
+
+        return [j.item() for i in actuals for j in i], [j.item() for i in probabilities for j in i]
 
     def run_approach(self, approach_number, x_train_f, x_train, x_test, y_train, image_datasets):
         self.init_optimizer(approach_number)
         # setup labeling indexed list
-        labels = [torch.FloatTensor([float(image_datasets['train'].classes[lookup]) for lookup in y_train]),
-                  # self.get_lbl_tensor(image_datasets, y_train),
+        labels = [torch.LongTensor([float(image_datasets['train'].classes[lookup]) for lookup in y_train]),
                   x_train_f
                   ]
         model, loss_func, opt = self.get_model(approach_number)
 
         loss_history = self.train(x_train_f, labels[approach_number - 1],
-                                  model, opt, loss_func, approach_number, 8000)
+                                  model, opt, loss_func, 8000)
         Plotter.plot_losses(loss_history)
 
         y_test_pred = self.predict(approach_number, model, x_train_f[0], x_test)
@@ -165,8 +173,8 @@ class TrainingPipeline:
         for i, model in enumerate(m):
             for x_test in x:
                 # apply the model
-                y_pred = self.predict(i + 1, model, x_test, x)
-                if i == 2:
+                y_pred  = self.predict(i + 1, model, x_test, x)
+                if i == 1:
                     Plotter.plot_sample(x_test.reshape(16, 16), y_pred.reshape(16, 16))
 
     @torch.no_grad()
@@ -186,7 +194,7 @@ class TrainingPipeline:
 
         return fh, ffa
 
-    def compute_statistics(self, model, x, approach=3):
+    def compute_statistics(self, model, x, approach=2):
         Fh = []
         Ffa = []
         for x_test in x:
@@ -204,11 +212,11 @@ class TrainingPipeline:
         stats = {}
         for sd in sdevs:
             image_datasets, loaders = self.initialize_data(data_dir, sdev=sd)
-            X_test, Y_test, X_test_f = self.load_all_data(loaders, kind='val')
+            X_test, Y_test, X_test_f = self.load_all_data(loaders, kind='raw')
 
             # plot train data with labels
             if render:
-                Plotter.plot_data(image_datasets, X_test, Y_test, kind='val')
+                Plotter.plot_data(image_datasets, X_test, Y_test, kind='raw')
 
             # calculate statistics
             stats[sd] = self.compute_statistics(model, X_test_f)
