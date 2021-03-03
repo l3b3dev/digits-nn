@@ -152,7 +152,7 @@ class TrainingPipeline:
         model, loss_func, opt = self.get_model(approach_number)
 
         loss_history = self.train(x_train_f, labels[approach_number - 1],
-                                  model, opt, loss_func, 8000)
+                                  model, opt, loss_func, 12000 if approach_number == 1 else 400)
         Plotter.plot_losses(loss_history)
 
         y_test_pred = self.predict(approach_number, model, x_train_f[0], x_test)

@@ -25,20 +25,20 @@ if __name__ == '__main__':
     pipeline.plot_features('data/train')
 
     # train model for Approach1
-    # model1 = pipeline.run_approach(1, X_train_f, X_train, X_raw_f, Y_train, image_datasets)
+    model1 = pipeline.run_approach(1, X_train_f, X_train, X_raw_f, Y_train, image_datasets)
     # #get info for ROC
     # actuals, class_probabilities = pipeline.get_class_probabilities(model1, X_test_f, X_raw_f)
     # Plotter.plot_class_roc(actuals, class_probabilities)
 
     # # train model for Approach2
-    # model2 = pipeline.run_approach(2, X_train_f, X_train, X_test_f, Y_train, image_datasets)
+    model2 = pipeline.run_approach(2, X_train_f, X_train, X_test_f, Y_train, image_datasets)
     # # get info for ROC
     # actuals, class_probabilities = pipeline.get_image_probabilities(model2, X_test_f)
     # Plotter.plot_class_roc(actuals, class_probabilities)
 
-    models = pipeline.load_pretrained(".")
+    #models = pipeline.load_pretrained(".")
     # decide which model is better
-    #models = [model1, model2]
+    models = [model1, model2]
     # pipeline.save_models(".", models)
     #pipeline.render_test_data(models, X_test_f, X_raw_f)
 

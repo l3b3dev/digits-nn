@@ -77,7 +77,7 @@ class Plotter:
         plt.figure(figsize=(8, 8))
         lw = 1
 
-        colors = cycle(['aqua', 'darkorange', 'cornflowerblue', 'yellow', 'blue', 'red'])
+        colors = cycle(['aqua', 'darkorange', 'cornflowerblue', 'yellow', 'blue', 'red', 'green','pink'])
         for (noise, (actuals, class_probabilities)), color in zip(probs.items(), colors):
             fpr, tpr, _ = roc_curve(actuals, class_probabilities)
             roc_auc = auc(fpr, tpr)
