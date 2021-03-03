@@ -5,8 +5,8 @@ import torch
 from torch import nn
 from torch.optim import SGD, Adam
 from torchvision import datasets, transforms
-import numpy as np
 
+from FeaturesController import FeaturesController
 from GaussianNoiseTransform import GaussianNoiseTransform
 from NN import DClassNet, DNet
 from Plotter import Plotter
@@ -18,12 +18,16 @@ class TrainingPipeline:
         self.loss = [nn.NLLLoss(),  # negative log-likelihood loss, needed for classification of 65 objects
                      nn.MSELoss()]
         self.optimizer = self.init_optimizer(1)
+        self.features_controller = FeaturesController()
 
     def init_optimizer(self, approach):
         self.optimizer = [SGD(self.models[approach - 1].parameters(), lr=0.001),
                           Adam(self.models[approach - 1].parameters(), lr=0.001)]
 
         return self.optimizer
+
+    def plot_features(self, x):
+        self.features_controller.plot_sift_descriptors(x)
 
     # Will try 2 approaches as listed in Step 02
     def get_model(self, approach):
@@ -122,19 +126,20 @@ class TrainingPipeline:
         output = classifier(x)
         prediction = output.argmax(dim=1, keepdim=True)
         pred_images = x_test[prediction - 1]
-        actuals = x.view_as(pred_images)
+        actuals = torch.round(x.view_as(pred_images))
         sm = torch.nn.Softmax()
         probabilities = sm(pred_images)
 
-        return [p.item() for i in actuals for j in i for p in j], [p.item() for i in probabilities for j in i for p in j]
+        return [p.item() for i in actuals for j in i for p in j], [p.item() for i in probabilities for j in i for p in
+                                                                   j]
 
     @torch.no_grad()
-    def get_image_probabilities(self, classifier, x):
+    def get_image_probabilities(self, classifier, x, x_raw_f):
         classifier.eval()
         output = classifier(x)
-        actuals = x.view_as(output)
         sm = torch.nn.Softmax()
         probabilities = sm(output)
+        actuals = torch.round(x.view_as(x))
 
         return [j.item() for i in actuals for j in i], [j.item() for i in probabilities for j in i]
 
@@ -158,7 +163,7 @@ class TrainingPipeline:
 
     def load_pretrained(self, path):
         _models = []
-        for approach_num in range(1, 4):
+        for approach_num in range(1, 3):
             model, _, _ = self.get_model(approach_num)
             model.load_state_dict(torch.load(f'{path}/model{approach_num}.pth'))
             model.eval()
@@ -166,11 +171,11 @@ class TrainingPipeline:
 
         return _models
 
-    def render_test_data(self, m, x):
+    def render_test_data(self, m, x, x_raw):
         for i, model in enumerate(m):
             for x_test in x:
                 # apply the model
-                y_pred  = self.predict(i + 1, model, x_test, x)
+                y_pred = self.predict(i + 1, model, x_test, x_raw)
                 if i == 1:
                     Plotter.plot_sample(x_test.reshape(16, 16), y_pred.reshape(16, 16))
 
@@ -191,12 +196,12 @@ class TrainingPipeline:
 
         return fh, ffa
 
-    def compute_statistics(self, model, x, approach=2):
+    def compute_statistics(self, model, x, x_raw_f,  approach=1):
         Fh = []
         Ffa = []
         for x_test in x:
             # apply the model
-            y_pred = self.predict(approach, model, x_test, x)
+            y_pred = self.predict(approach, model, x_test, x_raw_f)
 
             fh, ffa = self.get_fraction_statistics(x_test, y_pred)
 
@@ -205,17 +210,26 @@ class TrainingPipeline:
 
         return Fh, Ffa
 
-    def get_noise_stats(self, data_dir, model, sdevs, render=False):
+    def get_noise_stats(self, data_dir, model, sdevs, approach, x_raw_f, render=False):
         stats = {}
+        img_probs = {}
         for sd in sdevs:
             image_datasets, loaders = self.initialize_data(data_dir, sdev=sd)
-            X_test, Y_test, X_test_f = self.load_all_data(loaders, kind='raw')
+            X_test, Y_test, X_test_f = self.load_all_data(loaders, kind='test')
 
             # plot train data with labels
             if render:
-                Plotter.plot_data(image_datasets, X_test, Y_test, kind='raw')
+                Plotter.plot_data(image_datasets, X_test, Y_test, kind='test')
 
             # calculate statistics
-            stats[sd] = self.compute_statistics(model, X_test_f)
+            stats[sd] = self.compute_statistics(model, X_test_f, x_raw_f, approach)
+            img_probs[sd] = self.get_image_probabilities(model,
+                                                         X_test_f,
+                                                         x_raw_f) if approach == 2 else self.get_class_probabilities(
+                model, X_test_f, x_raw_f)
 
-        return stats
+        return stats, img_probs
+
+    def save_models(self, path, models):
+        for approach_num, model in enumerate(models):
+            torch.save(model.state_dict(), f'{path}/model{approach_num + 1}.pth')

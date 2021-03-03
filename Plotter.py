@@ -1,14 +1,16 @@
+from itertools import cycle
+
 import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve, auc
 
 
 class Plotter:
     @staticmethod
-    def plot_data(image_datasets, x_train, y_train, kind='train'):
+    def plot_data(image_datasets, x_train, y_train, title, kind='train'):
         # plot train data with labels
         R, C = 1, x_train.size(0)
         fig, ax = plt.subplots(R, C, figsize=(20, 10))
-        fig.suptitle('Training Data with corresponding labels')
+        fig.suptitle(title)
         for i, plot_cell in enumerate(ax):
             plot_cell.grid(False)
             plot_cell.axis('off')
@@ -26,9 +28,10 @@ class Plotter:
         plt.show()
 
     @staticmethod
-    def plot_stats(fh, ffa):
+    def plot_stats(fh, ffa, approach):
+        network = "Heteroassociative Multi-Layer Neural Network" if approach == 1 else "Autoassociative Multi-Layer Neural Network"
         plt.scatter(ffa, fh, facecolors='none', edgecolors='r')
-        plt.title('Fh vs Ffa')
+        plt.title(f'Fh vs Ffa for Approach {network}')
         plt.xlabel('Ffa')
         plt.ylabel('Fh')
         plt.show()
@@ -69,7 +72,31 @@ class Plotter:
         plt.show()
 
     @staticmethod
-    def plot_noise_stats(stats):
+    def plot_noise_roc(probs, approach):
+        network = "Heteroassociative Multi-Layer Neural Network" if approach == 1 else "Autoassociative Multi-Layer Neural Network"
+        plt.figure(figsize=(8, 8))
+        lw = 1
+
+        colors = cycle(['aqua', 'darkorange', 'cornflowerblue', 'yellow', 'blue', 'red'])
+        for (noise, (actuals, class_probabilities)), color in zip(probs.items(), colors):
+            fpr, tpr, _ = roc_curve(actuals, class_probabilities)
+            roc_auc = auc(fpr, tpr)
+            plt.plot(fpr, tpr, color=color,
+                     lw=lw, label='ROC curve for noise level {0} (area = {1:0.2f})'.format(noise, roc_auc))
+
+        plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('Ffa')
+        plt.ylabel('Fh')
+        plt.title(f'ROC Curve for {network}')
+        plt.legend(loc="lower right")
+        plt.show()
+
+    @staticmethod
+    def plot_noise_stats(stats, approach):
+        network = "Heteroassociative Multi-Layer Neural Network" if approach == 1 else "Autoassociative Multi-Layer Neural Network"
+
         x, y, z = [], [], []
         for sdev, (Fh, Ffa) in stats.items():
             x.append(sdev)
@@ -86,7 +113,7 @@ class Plotter:
         plt.axes().set_xticklabels(x)
         # plt.legend(labels=x)
         plt.title(
-            'Graph of Fh and Ffa for noise-corrupted Alphanumeric Imagery \n (16x16 pixels) for Autoassociative Single-Layer Perceptron')
+            f'Graph of Fh and Ffa for noise-corrupted Alphanumeric Imagery \n (16x16 pixels) for {network}')
         plt.xlabel('Gaussian Noise Level (stdev, at 14 pct xsecn)')
         plt.ylabel('Fh and Ffa')
         plt.show()
