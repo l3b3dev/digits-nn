@@ -50,7 +50,7 @@ if __name__ == '__main__':
         Plotter.plot_stats(Fh, Ffa, idx+1)
 
         stats, probs = pipeline.get_noise_stats(data_dir, model, sdevs, idx+1, X_raw_f)
-        pd.DataFrame.from_dict(data=stats).to_csv('data.csv', header=False)
+        pd.DataFrame.from_dict(data=stats).to_csv(f'data-model{idx+1}.csv', header=False)
 
         Plotter.plot_noise_stats(stats, idx+1)
         Plotter.plot_noise_roc(probs, idx+1)
